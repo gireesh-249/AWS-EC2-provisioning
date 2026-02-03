@@ -6,6 +6,16 @@ This README describes two ways to create an EC2 (virtual machine) on AWS:
 - **Terraform** — Infrastructure as Code with short steps and example configuration
 
 ---
+## Prerequisites
+
+- An AWS account with permissions to create EC2 resources.
+- A region selected for all resources (example: `ap-south-1`).
+- Optional but recommended: enable MFA (Multi-Factor Authentication) on your AWS account.
+
+For Terraform provisioning, you also need:
+- Terraform installed (`terraform -v`).
+- AWS CLI installed (`aws --version`).
+- AWS credentials configured (via `aws configure`).
 
 ## 🔧 Part - 1: Manual (AWS Console)
 
@@ -25,15 +35,26 @@ This README describes two ways to create an EC2 (virtual machine) on AWS:
 > Note: AMI IDs vary by region; pick the one appropriate for your region and OS.
 
 ### Useful commands (AWS CLI and local client)
-- `aws ec2 create-key-pair --key-name my-key --query 'KeyMaterial' --output text > my-key.pem` — create a key pair and save private key locally.
-- `chmod 400 my-key.pem` — restrict private key permissions (Linux/macOS/WSL) so SSH will accept it.
-- `aws ec2 run-instances --image-id <ami-id> --count 1 --instance-type t2.micro --key-name my-key --security-groups my-sg` — launch one EC2 instance via AWS CLI.
-- `aws ec2 describe-instances --filters "Name=instance-state-name,Values=running"` — list running instances and details.
-- `aws ec2 terminate-instances --instance-ids i-0123456789abcdef0` — stop and terminate an instance when done.
-- `aws ec2 authorize-security-group-ingress --group-id sg-xxxxxxxx --protocol tcp --port 22 --cidr <your-ip>/32` — add an SSH rule to a security group.
-- `ssh -i my-key.pem ec2-user@<public-ip>` — SSH into Amazon Linux/AMI instance (replace user if Ubuntu/other).
-- `aws ec2 allocate-address` / `aws ec2 associate-address` — allocate and attach an Elastic IP if you need a static public IP.
-
+- create a key pair and save private key locally.
+```bash 
+aws ec2 create-key-pair --key-name my-key --query 'KeyMaterial' --output text > my-key.pem
+```
+- security-groups my-sg` — launch one EC2 instance via AWS CLI
+```bash 
+aws ec2 run-instances --image-id <ami-id> --count 1 --instance-type t2.micro --key-name my-key
+```
+- list running instances and details.
+```bash
+aws ec2 describe-instances --filters "Name=instance-state-name,Values=running"
+```
+- stop and terminate an instance when done.
+```bash 
+aws ec2 terminate-instances --instance-ids i-0123456789abcdef0
+```
+-  add an SSH rule to a security group
+```bash 
+aws ec2 authorize-security-group-ingress --group-id sg-xxxxxxxx --protocol tcp --port 22 --cidr <your-ip>/32
+```
 ---
 
 ## 🌱 Part-2: Terraform (Infrastructure as Code)
@@ -56,40 +77,7 @@ This README describes two ways to create an EC2 (virtual machine) on AWS:
 - `terraform fmt` — format Terraform files to canonical style.
 - `terraform destroy` — destroy the resources created by your configuration.
 
-### Minimal example `main.tf`
-```hcl
-provider "aws" {
-  region = "us-east-1"
-}
 
-resource "aws_key_pair" "deployer" {
-  key_name   = "my-key"
-  public_key = file("~/.ssh/id_rsa.pub")
-}
-
-resource "aws_security_group" "ssh" {
-  name        = "allow_ssh"
-  description = "Allow SSH inbound"
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # restrict in production
-  }
-}
-
-resource "aws_instance" "example" {
-  ami           = "ami-0c94855ba95c71c99" # example: region-specific
-  instance_type = "t2.micro"
-  key_name      = aws_key_pair.deployer.key_name
-  vpc_security_group_ids = [aws_security_group.ssh.id]
-  tags = {
-    Name = "terraform-ec2-example"
-  }
-}
-```
-
-> Replace the `ami` with a valid AMI for your region and tighten security group rules for production (do not use 0.0.0.0/0 unless needed).
 
 ---
 
@@ -98,7 +86,3 @@ resource "aws_instance" "example" {
 - Permissions: Ensure your AWS credentials have appropriate IAM permissions for EC2 operations.
 - Key safety: Keep private keys secure and never commit them to source control.
 - Regions & AMIs: AMI IDs are region-specific — always select the correct AMI for your region.
-
----
-
-If you want, I can also add a complete, ready-to-run Terraform example that creates a key pair, security group, and EC2 instance tailored to a specific region. 💡
